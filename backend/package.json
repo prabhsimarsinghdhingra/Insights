@@ -1,0 +1,26 @@
+{
+  "name": "pure-insights-backend",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure Insights Command Center - API, telemetry and data pipeline",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "clean": "node src/clean.js data/raw/pure_insights_monitoring.csv data/out",
+    "simulate": "node src/simulate-account-usage.js data/raw/pure_insights_monitoring.csv data/out/load",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "snowflake-sdk": "^3.4.0",
+    "ws": "^8.18.0"
+  }
+}
