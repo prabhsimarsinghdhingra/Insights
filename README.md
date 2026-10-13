@@ -1,32 +1,63 @@
 # Pure Insights Command Center
 
-A demo workflow for report-health monitoring, data-quality review, real-time alerts, and cost attribution. The current repository uses a **local CSV/demo data source**. Snowflake SQL assets are included, but the live Snowflake adapter is not implemented in this version; do not treat demo metrics as live warehouse results.
+A full-stack monitoring and monetization dashboard for report health, data quality, real-time alerts, and cloud cost attribution.
+
+The application uses a **hybrid data architecture**: monitoring and telemetry can run on the supplied CSV/demo dataset, while cost attribution and reconciliation can use Snowflake when `DATA_SOURCE=snowflake` is configured.
+
+## Features
+
+- **Report monitoring:** report inventory, ownership, orphaned-report detection, and health metrics.
+- **Role-based access control:** viewer, analyst, and admin permissions.
+- **Real-time alerts:** WebSocket-based alert updates for latency breaches and failed refreshes.
+- **Telemetry simulation:** replay, pause/resume controls, and synthetic test-event injection.
+- **Data quality:** identify anomalies such as negative metering credits and missing report owners.
+- **Cost attribution:** allocate Snowflake usage to reports and calculate unit cost per active view.
+- **Reconciliation:** compare valid metered credits with attributed credits and separately track quarantined negative-credit windows.
+
+## Technology stack
+
+- Frontend: React and Vite
+- Backend: Node.js and Express
+- Real-time transport: WebSockets
+- Cost analytics: Snowflake SQL and the Snowflake Node.js SDK
+- Monitoring input: supplied CSV/demo data
 
 ## Requirements
 
 - Node.js 20 or newer
 - npm
+- Snowflake credentials and permissions when running with the Snowflake cost data source
 
-## Start the backend
+## Run locally
+
+### 1. Configure the backend
+
+From the repository root:
 
 ```bash
 cd backend
-cp ../.env.example .env
 npm install
+```
+
+Copy the root environment template to `backend/.env` and configure it for your intended mode. In PowerShell:
+
+```powershell
+Copy-Item ..\.env.example .env
+```
+
+Review the available environment variables before starting the server. Use demo mode for a local run without Snowflake credentials. For Snowflake cost analytics, set `DATA_SOURCE=snowflake` and configure the required Snowflake connection settings and access permissions.
+
+Start the API:
+
+```bash
 npm start
 ```
 
-The API listens at `http://localhost:4000` by default. Development demo accounts share the password `PureInsights#2026` unless `DEMO_PASSWORD` is set in `backend/.env`:
+The API listens at `http://localhost:4000` by default.
 
-- `admin@pureinsights.demo` — admin actions, including acknowledging alerts and telemetry controls
-- `analyst@pureinsights.demo` — analysis access
-- `viewer@pureinsights.demo` — read-only access
+### 2. Start the frontend
 
-These are demo identities only. Do not deploy the demo credentials or generated development JWT secret to production.
-
-## Start the frontend
-
-In a second terminal:
+Open a second terminal from the repository root:
 
 ```bash
 cd frontend
@@ -34,55 +65,68 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL shown in the terminal (normally `http://localhost:5173`). The frontend uses `http://localhost:4000` by default. To change this, create `frontend/.env.local` with:
+Open the Vite URL shown in the terminal, normally `http://localhost:5173`.
+
+The frontend uses `http://localhost:4000` by default. If required, create `frontend/.env.local` with:
 
 ```dotenv
 VITE_API_URL=http://localhost:4000
 ```
 
-## Verify
+## Demo accounts
 
-From `backend/`:
+The local demo configuration provides these identities:
+
+- `admin@pureinsights.demo` — administrative actions
+- `analyst@pureinsights.demo` — analysis and report access
+- `viewer@pureinsights.demo` — read-only access
+
+Use the demo password configured by `DEMO_PASSWORD` in your local environment. Demo identities and development secrets are for local assessment use only. Never deploy them to production.
+
+## Validation
+
+Run backend checks from `backend/`:
 
 ```bash
 npm test
 npm run smoke
 ```
 
-From `frontend/`:
+Build the frontend from `frontend/`:
 
 ```bash
+npm install
 npm run build
 ```
 
-Run these in your local environment after installing dependencies. A source-only ZIP does not prove that dependency installation, the full Express/JWT/WebSocket runtime, or a live Snowflake connection has been verified.
+The smoke test covers authentication, role permissions, report ownership, cost reconciliation, anomaly reporting, WebSocket ticket security, and alert creation and resolution.
 
-## Demo walkthrough
+If the test suite is configured to run live Snowflake checks, those checks require valid credentials and network access. Keep credential-dependent integration tests distinct from offline tests when running in a clean environment.
 
-1. Sign in as the admin demo account.
-2. Review the Overview KPIs and note the demo-data banner.
-3. Open Live alerts and acknowledge an open alert if present.
-4. Use **Inject test event** to submit a synthetic high-latency or failed-refresh reading and inspect the resulting alert.
-5. Review report inventory and export its current result set as CSV.
-6. Inspect data-quality exceptions and the cost reconciliation result.
-7. Explain which metrics are derived from local sample data and which require live Snowflake validation.
+## Documentation
 
-## API areas used by the UI
+- [`docs/API_WEBSOCKET_SPEC.md`](docs/API_WEBSOCKET_SPEC.md) — REST endpoints, permissions, WebSocket authentication, event types, and operational safeguards.
+- [`docs/SNOWFLAKE_VALIDATION_EVIDENCE.md`](docs/SNOWFLAKE_VALIDATION_EVIDENCE.md) — observed Snowflake query results and validation qualifications.
+- [`docs/SUBMISSION_VALIDATION.md`](docs/SUBMISSION_VALIDATION.md) — final verification checklist.
+- [`snowflake/`](snowflake/) — setup, table, service-user, cost-attribution, and validation query scripts.
 
-- `GET /api/health/summary`
-- `GET /api/reports`
-- `GET /api/alerts`
-- `POST /api/alerts/:id/ack`
-- `GET /api/data-quality/anomalies`
-- `GET /api/costs/attribution`
-- `GET /api/costs/reconciliation`
-- `GET /api/telemetry/status`
-- `POST /api/telemetry/control`
-- `POST /api/telemetry/inject`
+## Snowflake SQL execution
+
+Review the SQL scripts in order:
+
+1. `snowflake/01_setup.sql`
+2. `snowflake/02_tables.sql`
+3. `snowflake/03_service_user.sql`
+4. `snowflake/04_cost_attribution.sql`
+5. `snowflake/05_cost_queries.sql`
+
+Run them only in an appropriate Snowflake development environment, after reviewing database, schema, warehouse, role, and privilege settings. The service-user script may require elevated administrative permissions; do not grant broad production privileges without review.
+
+The validation evidence records the results observed during the documented Snowflake run. Re-run the queries in your target environment before relying on those values operationally.
 
 ## Important limitations
 
-- The UI is intended as a prototype/demo, not a production deployment.
-- Snowflake SQL scripts are provided under `snowflake/`, but live connection wiring and execution must be implemented and verified separately.
-- Cost reconciliation currently evaluates the included simulated usage data. The dashboard explicitly labels the source as demo CSV.
-- AI suggestion evaluation is represented by a validation checklist and traceability workflow concept; a production AI recommendation evaluator and human-review queue would require additional implementation.
+- This project is an assessment prototype, not a production-ready deployment.
+- CSV/demo monitoring values are simulated or sample-derived and must not be presented as live production telemetry.
+- Snowflake cost metrics are available only when the Snowflake data source is configured and functioning.
+- Production deployment would require environment-specific security hardening, monitoring, operational procedures, and further validation.
